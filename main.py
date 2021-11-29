@@ -8,8 +8,8 @@ FILE_NAME2 = 'z_boson_data_2.csv'
 
 speed_of_light = 299792458 #m/s
 gamma_ee = 0.08391 #GeV
-'''gamma_z = 3 #Gev
-m_z = 90 #Gev/c^2''' #values should be around these
+gamma_z = 3 #Gev
+m_z = 90 #Gev/c^2 #values should be around these
 
 def general_function(E, m, gamma):
     """
@@ -77,7 +77,7 @@ def plot_data(data):
     ax.scatter(data[:, 0], data[:, 1], marker='o', s=4)
     ax.set_ylim(0, 2.5)
     ax.set_title('Plot of data')
-    '''ax.scatter(data[:,0], general_function(data[:,0], m_z, gamma_z))'''
+    ax.scatter(data[:,0], general_function(data[:,0], m_z, gamma_z))
     plt.show()
 
     return None
@@ -85,7 +85,7 @@ def plot_data(data):
 def main():
     data = np.vstack((filter(read_data(FILE_NAME1)),filter(read_data(FILE_NAME2))))
     '''expected_m_z, expected_gamma_z = find_parameters(data)'''
-    '''plot_data(data, expected_m_z, expected_gamma_z)'''
+    plot_data(data)
 
     return 0
 
