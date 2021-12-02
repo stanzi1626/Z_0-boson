@@ -9,9 +9,9 @@ FILE_NAME2 = 'z_boson_data_2.csv'
 gamma_ee = 0.08391 #GeV
 start_gamma_z = 3 #Gev
 start_m_z = 90 #Gev/c^2 #values should be around these
-'''STEP_SIZE = 0.0001
+STEP_SIZE = 0.0001
 TOLERANCE = 0.0001
-MAX_ITERATIONS = 100000'''
+MAX_ITERATIONS = 100000
 
 def general_function(E, m, gamma):
     """
@@ -30,6 +30,54 @@ def general_function(E, m, gamma):
     conversion = 0.3894e6 #change the values into nb
 
     return (12*math.pi/(m**2))*(np.square(E)/((np.square(E) - m**2)**2 + (m**2*gamma**2))) * gamma_ee**2 * conversion
+
+def hill_climbing(function, x_minimum, step=STEP_SIZE):
+    """
+    Performs 1D hill climbing algorithm with varying step size.
+
+    Parameters
+    ----------
+    function : function of single argument (float) that returns a float
+    x_minimum : float, optional
+        The default is START_VALUE.
+    step : float, optional
+        The default is STEP_SIZE.
+
+    Returns
+    -------
+    x_minimum : float
+        Optimum value of parameter
+    minimum : float
+        Minimum value of function
+    counter : int
+        Number of iterations
+    """
+    difference = 1
+    minimum = function(x_minimum)
+    counter = 0
+
+    while difference > TOLERANCE:
+        counter += 1
+        minimum_test_minus = function(x_minimum - step)
+        minimum_test_plus = function(x_minimum + step)
+        if minimum_test_minus < minimum:
+            x_minimum -= step
+            difference = minimum - minimum_test_minus
+            minimum = function(x_minimum)
+        elif function(x_minimum + step) < minimum:
+            x_minimum += step
+            difference = minimum - minimum_test_plus
+            minimum = function(x_minimum)
+        else:
+            step = step * 0.1
+
+        if counter == MAX_ITERATIONS:
+            print('Failed to find solution after {0:d} iterations.'.
+                  format(counter))
+            break
+
+    return x_minimum, minimum, counter
+
 
 def find_parameters(data):
     """
