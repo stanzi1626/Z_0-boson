@@ -6,10 +6,12 @@ import scipy.optimize
 FILE_NAME1 = 'z_boson_data_1.csv'
 FILE_NAME2 = 'z_boson_data_2.csv'
 
-speed_of_light = 299792458 #m/s
 gamma_ee = 0.08391 #GeV
-gamma_z = 3 #Gev
-m_z = 90 #Gev/c^2 #values should be around these
+start_gamma_z = 3 #Gev
+start_m_z = 90 #Gev/c^2 #values should be around these
+'''STEP_SIZE = 0.0001
+TOLERANCE = 0.0001
+MAX_ITERATIONS = 100000'''
 
 def general_function(E, m, gamma):
     """
@@ -30,7 +32,10 @@ def general_function(E, m, gamma):
     return (12*math.pi/(m**2))*(np.square(E)/((np.square(E) - m**2)**2 + (m**2*gamma**2))) * gamma_ee**2 * conversion
 
 def find_parameters(data):
-    x, y = scipy.optimize.curve_fit(general_function, data[:,0], data[:,1], sigma = data[:, 2])
+    """
+    
+    """
+    x, y = scipy.optimize.curve_fit(general_function, data[:,0], data[:,1], sigma = data[:, 2], p0=[start_m_z, start_gamma_z])
     return x[0], x[1]
 
 def read_data(filname):
@@ -48,6 +53,9 @@ def read_data(filname):
     return np.genfromtxt(filname, dtype='float', delimiter=',', skip_header=1)
 
 def filter(data):
+    """
+    
+    """
     index = 0
     for line in data:
         for i in range(0, len(line)):
@@ -77,15 +85,17 @@ def plot_data(data):
     ax.scatter(data[:, 0], data[:, 1], marker='o', s=4)
     ax.set_ylim(0, 2.5)
     ax.set_title('Plot of data')
-    ax.scatter(data[:,0], general_function(data[:,0], m_z, gamma_z))
+    ax.scatter(data[:,0], general_function(data[:,0], start_m_z, start_gamma_z))
     plt.show()
 
     return None
 
 def main():
     data = np.vstack((filter(read_data(FILE_NAME1)),filter(read_data(FILE_NAME2))))
-    '''expected_m_z, expected_gamma_z = find_parameters(data)'''
-    plot_data(data)
+    expected_m_z, expected_gamma_z = find_parameters(data)
+    print(expected_gamma_z)
+    print(expected_m_z)
+    '''plot_data(data)'''
 
     return 0
 
