@@ -2,6 +2,7 @@ import numpy as np
 import math
 import matplotlib.pyplot as plt
 import scipy.optimize
+from mpl_toolkits import mplot3d
 
 FILE_NAME1 = 'z_boson_data_1.csv'
 FILE_NAME2 = 'z_boson_data_2.csv'
@@ -11,9 +12,7 @@ FILE_NAME2 = 'z_boson_data_2.csv'
 gamma_ee = 0.08391 #GeV
 start_gamma_z = 3 #Gev
 start_m_z = 90 #Gev/c^2 #values should be around these
-STEP_SIZE = 0.1
-TOLERANCE = 0.000001
-MAX_ITERATIONS = 10000
+uncertainty_confidence = 3
 
 def general_function(E, m, gamma):
     """
@@ -34,89 +33,11 @@ def general_function(E, m, gamma):
     return (12*math.pi/(m**2))*(np.square(E)/((np.square(E) - m**2)**2 + (m**2*gamma**2))) * gamma_ee**2 * conversion
 
 
-#the idea at the momement is to do each parameter one at a time until the chi-sqauared is within some tolerance, this 
-#is a work around while the scipy.optimize isnt working
-
-def hill_climbing(function, m_minimum, gamma_minimum, step1=STEP_SIZE, step2=STEP_SIZE):
+def reduced_chi_square(observation, observation_uncertainty, prediction):
     """
-    Performs 1D hill climbing algorithm with varying step size.
-
-    Parameters
-    ----------
-    function : function of single argument (float) that returns a float
-    x_minimum : float, optional
-        The default is START_VALUE.
-    step : float, optional
-        The default is STEP_SIZE.
-
-    Returns
-    -------
-    x_minimum : float
-        Optimum value of parameter
-    minimum : float
-        Minimum value of function
-    counter : int
-        Number of iterations
+    Returns the reduced chi sqaured
     """
-    difference = 1
-    minimum = function(m_minimum, gamma_minimum)
-    counter = 0
-    counter_1 = 0
-    counter_2 = 0
-
-    while difference > TOLERANCE:
-        counter += 1
-
-        while True:
-            counter_1 += 1
-            minimum1_test_minus = function(m_minimum - step1, gamma_minimum)
-            minimum1_test_plus = function(m_minimum + step1, gamma_minimum)
-            if minimum1_test_minus < minimum:
-                m_minimum -= step1
-                difference = minimum - minimum1_test_minus
-                minimum = function(m_minimum, gamma_minimum)  
-                break   
-            elif minimum1_test_plus < minimum:
-                m_minimum += step1
-                difference = minimum - minimum1_test_plus
-                minimum = function(m_minimum, gamma_minimum)
-                break
-            else:
-                step1 = step1 * 0.1
-            if counter_1 == 1000:
-                break
-
-        while True:
-            counter_2 += 1
-            minimum2_test_minus = function(m_minimum, gamma_minimum - step2)
-            minimum2_test_plus = function(m_minimum, gamma_minimum + step2)
-            if minimum2_test_minus < minimum:
-                gamma_minimum -= step2
-                difference = minimum - minimum2_test_minus
-                minimum = function(m_minimum, gamma_minimum)
-                break
-            elif minimum2_test_plus < minimum:
-                gamma_minimum += step2
-                difference = minimum - minimum2_test_plus
-                minimum = function(m_minimum, gamma_minimum)
-                break
-            else:
-                step2 = step2 * 0.1
-            if counter_2 == 1000:
-                break
-
-        if counter == MAX_ITERATIONS:
-            print('Failed to find best solution after {0:d} iterations.'.
-                  format(counter))
-            break
-
-    return m_minimum, gamma_minimum, minimum
-
-def chi_square(observation, observation_uncertainty, prediction):
-    """
-    Returns the chi sqaured
-    """
-    return np.sum((observation - prediction)**2 / observation_uncertainty**2)
+    return (np.sum(((observation - prediction) / observation_uncertainty)**2)) / len(observation - 1)
 
 def find_parameters(data):
     """
@@ -139,7 +60,7 @@ def read_data(filname):
     """
     return np.genfromtxt(filname, dtype='float', delimiter=',', skip_header=1)
 
-def filter(data):
+def filter_initial(data):
     """
     removes all nans
     removes all 0 uncertainties
@@ -162,6 +83,24 @@ def filter(data):
         index += 1
     return data
 
+def uncertainty_filter(data, m_z, gamma_z):
+    count = 0
+    index = 0
+    for line in data:
+        if line[1] + line[2]*uncertainty_confidence < general_function(line[0], m_z, gamma_z) or line[1] - line[2]*uncertainty_confidence > general_function(line[0], m_z, gamma_z):
+            data = np.delete(data, index, axis=0)
+            count += 1
+            index -= 1
+        index += 1
+    return data, count
+
+def find_final_parameters(data):
+    while True:
+        m_z, gamma_z = find_parameters(data)
+        data, count = uncertainty_filter(data, m_z, gamma_z)
+        if count == 0:
+            break
+    return data, m_z, gamma_z
 
 def plot_data(data, m_z, gamma_z):
     """
@@ -176,24 +115,72 @@ def plot_data(data, m_z, gamma_z):
     None.
     """
 
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    ax.scatter(data[:, 0], data[:, 1], marker='o', s=4)
-    ax.set_ylim(0, 2.5)
-    ax.set_title('Plot of data')
-    ax.scatter(data[:,0], general_function(data[:,0], start_m_z, start_gamma_z))
-    ax.scatter(data[:,0], general_function(data[:,0], m_z, gamma_z))
+    m_data = np.linspace(m_z - 1.5, m_z + 1.5,len(data[:,0]))
+    gamma_data = np.linspace(gamma_z - 0.1, gamma_z + 0.1, len(data[:,0]))
+
+    chi_m_data = []
+    for i in range(len(data[:,0])):
+        chi_m_data.append(reduced_chi_square(data[:,1], data[:,2], general_function(data[:,0], m_data[i], gamma_z)))
+    
+    chi_gamma_data = []
+    for i in range(len(data[:,0])):
+        chi_gamma_data.append(reduced_chi_square(data[:,1], data[:,2], general_function(data[:,0], m_z, gamma_data[i])))
+
+    fig, (ax1, ax2, ax3) = plt.subplots(3)
+    ax1.errorbar(data[:, 0], data[:, 1], yerr=data[:, 2], fmt='o')
+    ax1.set_title('Plot of data')
+    ax1.scatter(data[:,0], general_function(data[:,0], start_m_z, start_gamma_z))
+    ax1.scatter(data[:,0], general_function(data[:,0], m_z, gamma_z))
+
+    ax2.scatter(m_data, chi_m_data)
+    ax3.scatter(gamma_data, chi_gamma_data)
+    ax3.plot(gamma_z, np.min(gamma_data), 'ro')
     plt.show()
 
     return None
 
+def plot_3d(data, true_m_z, true_gamma_z):
+    """
+    
+    """
+    fig = plt.figure()
+    ax = plt.axes(projection='3d')
+
+    diference1 = true_m_z / 10
+    difference2 = true_gamma_z / 10
+
+    x = np.linspace(true_m_z + diference1, true_m_z - diference1, len(data[:,0]))
+    y = np.linspace(true_gamma_z + difference2, true_gamma_z - difference2, len(data[:,0]))
+    
+    X, Y = np.meshgrid(x, y)
+
+    Z = np.zeros((0, len(X[:,0])))
+    index = 0
+    for line in Y:
+        temp = []
+        for i in range(len(X[:,0])):
+            temp.append(reduced_chi_square(data[:,1], data[:,2], general_function(data[:,0], X[index, i], line[i])))
+        Z = np.vstack((Z, temp))
+        index += 1
+
+    ax.scatter3D(X, Y, Z)
+    ax.set_xlim3d(true_m_z + diference1, true_m_z - diference1)
+    ax.set_ylim3d(true_gamma_z + difference2, true_gamma_z - difference2)
+    ax.set_zlim3d(np.min(Z), np.max(Z))
+    ax.set_xlabel('x')
+    ax.set_ylabel('y')
+    ax.set_zlabel('z')
+
+    plt.show()
+
 def main():
-    data = np.vstack((filter(read_data(FILE_NAME1)),filter(read_data(FILE_NAME2))))
-    expected_m_z, expected_gamma_z, chi = hill_climbing(lambda coefficient1, coefficient2: chi_square(data[:,1], data[:,2], general_function(data[:,0], coefficient1, coefficient2)), start_m_z, start_gamma_z)
-    print(expected_m_z)
-    print(expected_gamma_z)
-    print(chi)
+    """
+    
+    """
+    data = np.vstack((filter_initial(read_data(FILE_NAME1)),filter_initial(read_data(FILE_NAME2))))
+    data, expected_m_z, expected_gamma_z = find_final_parameters(data)
     plot_data(data, expected_m_z, expected_gamma_z)
+    '''plot_3d(data, expected_m_z, expected_gamma_z)'''
 
     return 0
 
