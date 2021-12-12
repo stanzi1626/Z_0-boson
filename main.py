@@ -7,8 +7,6 @@ from mpl_toolkits import mplot3d
 FILE_NAME1 = 'z_boson_data_1.csv'
 FILE_NAME2 = 'z_boson_data_2.csv'
 
-#line 18 data 1 86.5354,1.1222,0.0754
-
 gamma_ee = 0.08391 #GeV
 start_gamma_z = 3 #Gev
 start_m_z = 90 #Gev/c^2 #values should be around these
@@ -46,7 +44,7 @@ def find_parameters(data):
     x, y = scipy.optimize.curve_fit(general_function, data[:,0], data[:,1], sigma = data[:, 2], p0=[start_m_z, start_gamma_z])
     return x[0], x[1]
 
-def read_data(filname):
+def read_data(filename):
     """
     Reads in data file.
 
@@ -58,7 +56,7 @@ def read_data(filname):
     -------
     2D numpy array of floats
     """
-    return np.genfromtxt(filname, dtype='float', delimiter=',', skip_header=1)
+    return np.genfromtxt(filename, dtype='float', delimiter=',', skip_header=1)
 
 def filter_initial(data):
     """
@@ -84,6 +82,9 @@ def filter_initial(data):
     return data
 
 def uncertainty_filter(data, m_z, gamma_z):
+    """
+    
+    """
     count = 0
     index = 0
     for line in data:
@@ -95,6 +96,9 @@ def uncertainty_filter(data, m_z, gamma_z):
     return data, count
 
 def find_final_parameters(data):
+    """
+    
+    """
     while True:
         m_z, gamma_z = find_parameters(data)
         data, count = uncertainty_filter(data, m_z, gamma_z)
@@ -115,8 +119,8 @@ def plot_data(data, m_z, gamma_z):
     None.
     """
 
-    m_data = np.linspace(m_z - 1.5, m_z + 1.5,len(data[:,0]))
-    gamma_data = np.linspace(gamma_z - 0.1, gamma_z + 0.1, len(data[:,0]))
+    m_data = np.linspace(m_z - 10, m_z + 10,len(data[:,0]))
+    gamma_data = np.linspace(gamma_z - 1, gamma_z + 1, len(data[:,0]))
 
     chi_m_data = []
     for i in range(len(data[:,0])):
@@ -126,15 +130,23 @@ def plot_data(data, m_z, gamma_z):
     for i in range(len(data[:,0])):
         chi_gamma_data.append(reduced_chi_square(data[:,1], data[:,2], general_function(data[:,0], m_z, gamma_data[i])))
 
-    fig, (ax1, ax2, ax3) = plt.subplots(3)
+    fig, (ax1, ax2, ax3) = plt.subplots(1, 3)
     ax1.errorbar(data[:, 0], data[:, 1], yerr=data[:, 2], fmt='o')
-    ax1.set_title('Plot of data')
-    ax1.scatter(data[:,0], general_function(data[:,0], start_m_z, start_gamma_z))
+    ax1.set_title('Cross-sectional area against Energy')
+    ax1.set_xlabel('Energy / Gev')
+    ax1.set_ylabel('Cross-sectional area / nb')
+    '''ax1.scatter(data[:,0], general_function(data[:,0], start_m_z, start_gamma_z))'''
     ax1.scatter(data[:,0], general_function(data[:,0], m_z, gamma_z))
 
+    ax2.set_title('Reduced chi-sqaured against varying m_z')
+    ax2.set_xlabel('m_z / Gev*c^-2')
+    ax2.set_ylabel('Reduced chi-sqaured')
     ax2.scatter(m_data, chi_m_data)
+
+    ax3.set_title('Reduced chi-sqaured against varying gamma_z')
+    ax3.set_xlabel('gamma_z / Gev')
+    ax3.set_ylabel('Reduced chi-sqaured')
     ax3.scatter(gamma_data, chi_gamma_data)
-    ax3.plot(gamma_z, np.min(gamma_data), 'ro')
     plt.show()
 
     return None
@@ -146,8 +158,8 @@ def plot_3d(data, true_m_z, true_gamma_z):
     fig = plt.figure()
     ax = plt.axes(projection='3d')
 
-    diference1 = true_m_z / 10
-    difference2 = true_gamma_z / 10
+    diference1 = 0.05
+    difference2 = 0.05
 
     x = np.linspace(true_m_z + diference1, true_m_z - diference1, len(data[:,0]))
     y = np.linspace(true_gamma_z + difference2, true_gamma_z - difference2, len(data[:,0]))
@@ -180,7 +192,7 @@ def main():
     data = np.vstack((filter_initial(read_data(FILE_NAME1)),filter_initial(read_data(FILE_NAME2))))
     data, expected_m_z, expected_gamma_z = find_final_parameters(data)
     plot_data(data, expected_m_z, expected_gamma_z)
-    '''plot_3d(data, expected_m_z, expected_gamma_z)'''
+    plot_3d(data, expected_m_z, expected_gamma_z)
 
     return 0
 
