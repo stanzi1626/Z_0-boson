@@ -9,7 +9,7 @@ FILE_NAME2 = 'z_boson_data_2.csv'
 
 start_gamma_ee = 1 #GeV
 start_gamma_z = 3 #Gev
-start_m_z = 90 #Gev/c^2 #values should be around these
+start_m_z = 90 #Gev/c^2 
 uncertainty_confidence = 3
 
 def general_function(E, m, gamma_z, gamma_ee):
@@ -21,12 +21,13 @@ def general_function(E, m, gamma_z, gamma_ee):
     E: array
     m_z: float
     gamma_z: float
+    gamma_ee: float
 
     Returns
     -------
-    2D numpy array of floats    
+    1D numpy array of floats    
     """
-    conversion = 0.3894e6 #change the values into nb
+    conversion = 0.3894e6 
 
     return (12*math.pi/(m**2))*(np.square(E)/((np.square(E) - m**2)**2 + (m**2*gamma_z**2))) * gamma_ee**2 * conversion
 
@@ -34,12 +35,29 @@ def general_function(E, m, gamma_z, gamma_ee):
 def reduced_chi_square(observation, observation_uncertainty, prediction):
     """
     Returns the reduced chi sqaured
+
+    Parameters
+    ----------
+    observation: 1D array
+    observation_uncertainty: 1D array
+    prediction: 1D array
+
+    Returns: 
+    float
     """
     return (np.sum(((observation - prediction) / observation_uncertainty)**2)) / len(observation - 1)
 
 def find_parameters(data):
     """
-    
+    Finds the best values for m_z, gamma_z and gamma_ee to have the lowest chi-square
+
+    Paramaters
+    ----------
+    data: 2D array of floats
+
+    Returns
+    -------
+    3 floats
     """
     x, y = scipy.optimize.curve_fit(general_function, data[:,0], data[:,1], sigma = data[:, 2], p0=[start_m_z, start_gamma_z, start_gamma_ee])
     return x[0], x[1], x[2]
@@ -60,9 +78,16 @@ def read_data(filename):
 
 def filter_initial(data):
     """
-    removes all nans
-    removes all 0 uncertainties
-    removes values that are 10* more than the average without it 
+    A filter which removes all nans, removes all 0 uncertainties
+    and removes values whose emmission changes the average by more than 0.1
+
+    Paramaters
+    ----------
+    data: 2D array of floats and nans
+
+    Returns
+    -------
+    2D numpy array of floats
     """
     index = 0
     average = np.average(data[:,1])
@@ -81,9 +106,48 @@ def filter_initial(data):
         index += 1
     return data
 
+def create_data():
+    """
+    Creates the initial data array with files that user inputs
+
+    Parameters
+    ----------
+
+    Returns
+    -------
+    2D numpy array of floats
+    """
+    data = np.zeros((0,3))
+    while True:
+        try:
+            number_of_files = int(input(print('How many files would you like to read in: ')))
+            break
+        except ValueError:
+            print('Please enter an integer')
+    for i in range(number_of_files):
+        filename = input(print('Input the name of the file: '))
+        temp = filter_initial(read_data(filename))
+        data = np.vstack((data, temp))
+
+    return data
+
+
 def uncertainty_filter(data, m_z, gamma_z, gamma_ee):
     """
-    
+    Removes all data which are greater than uncertainty confidence*standard deviation
+    away from the prediction. Returns how many values were removed
+
+    Parameters
+    ----------
+    data: 2D array of floats
+    m_z: float
+    gamma_z: float
+    gamma_ee: float
+
+    Returns
+    -------
+    2D numpy array of floats 
+    float
     """
     count = 0
     index = 0
@@ -97,7 +161,16 @@ def uncertainty_filter(data, m_z, gamma_z, gamma_ee):
 
 def find_final_parameters(data):
     """
-    
+    Finds the best parameters for function and filters data
+
+    Parameters
+    ----------
+    data: 2D numpy array of floats
+
+    Returns
+    -------
+    2D numpy array of floats
+    3 floats
     """
     while True:
         m_z, gamma_z, gamma_ee = find_parameters(data)
@@ -108,15 +181,15 @@ def find_final_parameters(data):
 
 def plot_data(data, m_z, gamma_z, gamma_ee):
     """
-    Produces a plot of the data.
+    Produces a 2D plot of the data.
 
     Parameters
     ----------
-    data : 2D numpy array of floats.
+    data: 2D numpy array of floats.
 
     Returns
     -------
-    None.
+    None
     """
 
     m_data = np.linspace(m_z - 10, m_z + 10,len(data[:,0]))
@@ -162,9 +235,20 @@ def plot_data(data, m_z, gamma_z, gamma_ee):
 
     return None
 
-def plot_3d(data, true_m_z, true_gamma_z, true_gamma_ee):
+def plot_3d(data, m_z, gamma_z, gamma_ee):
     """
-    
+    Produces a 3D plot of chi-squared against varying m_z and gamma_z
+
+    Parameters
+    ----------
+    data: 2D numpy array of floats
+    m_z: float
+    gamma_z: float
+    gamma_ee: float
+
+    Returns
+    -------
+    None
     """
     fig = plt.figure()
     ax = plt.axes(projection='3d')
@@ -172,8 +256,8 @@ def plot_3d(data, true_m_z, true_gamma_z, true_gamma_ee):
     diference1 = 0.05
     difference2 = 0.05
 
-    x = np.linspace(true_m_z + diference1, true_m_z - diference1, len(data[:,0]))
-    y = np.linspace(true_gamma_z + difference2, true_gamma_z - difference2, len(data[:,0]))
+    x = np.linspace(m_z + diference1, m_z - diference1, len(data[:,0]))
+    y = np.linspace(gamma_z + difference2, gamma_z - difference2, len(data[:,0]))
     
     X, Y = np.meshgrid(x, y)
 
@@ -182,13 +266,13 @@ def plot_3d(data, true_m_z, true_gamma_z, true_gamma_ee):
     for line in Y:
         temp = []
         for i in range(len(X[:,0])):
-            temp.append(reduced_chi_square(data[:,1], data[:,2], general_function(data[:,0], X[index, i], line[i], true_gamma_ee)))
+            temp.append(reduced_chi_square(data[:,1], data[:,2], general_function(data[:,0], X[index, i], line[i], gamma_ee)))
         Z = np.vstack((Z, temp))
         index += 1
 
     ax.scatter3D(X, Y, Z)
-    ax.set_xlim3d(true_m_z + diference1, true_m_z - diference1)
-    ax.set_ylim3d(true_gamma_z + difference2, true_gamma_z - difference2)
+    ax.set_xlim3d(m_z + diference1, m_z - diference1)
+    ax.set_ylim3d(gamma_z + difference2, gamma_z - difference2)
     ax.set_zlim3d(np.min(Z), np.max(Z))
     ax.set_xlabel('x')
     ax.set_ylabel('y')
@@ -196,10 +280,13 @@ def plot_3d(data, true_m_z, true_gamma_z, true_gamma_ee):
 
     plt.show()
 
+    return None
+
 def main():
     """
     
     """
+    '''data = create_data()'''
     data = np.vstack((filter_initial(read_data(FILE_NAME1)),filter_initial(read_data(FILE_NAME2))))
     data, expected_m_z, expected_gamma_z, expected_gamma_ee = find_final_parameters(data)
     plot_data(data, expected_m_z, expected_gamma_z, expected_gamma_ee)
