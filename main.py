@@ -7,12 +7,12 @@ from mpl_toolkits import mplot3d
 FILE_NAME1 = 'z_boson_data_1.csv'
 FILE_NAME2 = 'z_boson_data_2.csv'
 
-gamma_ee = 0.08391 #GeV
+start_gamma_ee = 1 #GeV
 start_gamma_z = 3 #Gev
 start_m_z = 90 #Gev/c^2 #values should be around these
 uncertainty_confidence = 3
 
-def general_function(E, m, gamma):
+def general_function(E, m, gamma_z, gamma_ee):
     """
     Takes in energy values and returns the cross-sectional area
 
@@ -28,7 +28,7 @@ def general_function(E, m, gamma):
     """
     conversion = 0.3894e6 #change the values into nb
 
-    return (12*math.pi/(m**2))*(np.square(E)/((np.square(E) - m**2)**2 + (m**2*gamma**2))) * gamma_ee**2 * conversion
+    return (12*math.pi/(m**2))*(np.square(E)/((np.square(E) - m**2)**2 + (m**2*gamma_z**2))) * gamma_ee**2 * conversion
 
 
 def reduced_chi_square(observation, observation_uncertainty, prediction):
@@ -41,8 +41,8 @@ def find_parameters(data):
     """
     
     """
-    x, y = scipy.optimize.curve_fit(general_function, data[:,0], data[:,1], sigma = data[:, 2], p0=[start_m_z, start_gamma_z])
-    return x[0], x[1]
+    x, y = scipy.optimize.curve_fit(general_function, data[:,0], data[:,1], sigma = data[:, 2], p0=[start_m_z, start_gamma_z, start_gamma_ee])
+    return x[0], x[1], x[2]
 
 def read_data(filename):
     """
@@ -81,14 +81,14 @@ def filter_initial(data):
         index += 1
     return data
 
-def uncertainty_filter(data, m_z, gamma_z):
+def uncertainty_filter(data, m_z, gamma_z, gamma_ee):
     """
     
     """
     count = 0
     index = 0
     for line in data:
-        if line[1] + line[2]*uncertainty_confidence < general_function(line[0], m_z, gamma_z) or line[1] - line[2]*uncertainty_confidence > general_function(line[0], m_z, gamma_z):
+        if line[1] + line[2]*uncertainty_confidence < general_function(line[0], m_z, gamma_z, gamma_ee) or line[1] - line[2]*uncertainty_confidence > general_function(line[0], m_z, gamma_z, gamma_ee):
             data = np.delete(data, index, axis=0)
             count += 1
             index -= 1
@@ -100,13 +100,13 @@ def find_final_parameters(data):
     
     """
     while True:
-        m_z, gamma_z = find_parameters(data)
-        data, count = uncertainty_filter(data, m_z, gamma_z)
+        m_z, gamma_z, gamma_ee = find_parameters(data)
+        data, count = uncertainty_filter(data, m_z, gamma_z, gamma_ee)
         if count == 0:
             break
-    return data, m_z, gamma_z
+    return data, m_z, gamma_z, gamma_ee
 
-def plot_data(data, m_z, gamma_z):
+def plot_data(data, m_z, gamma_z, gamma_ee):
     """
     Produces a plot of the data.
 
@@ -120,23 +120,29 @@ def plot_data(data, m_z, gamma_z):
     """
 
     m_data = np.linspace(m_z - 10, m_z + 10,len(data[:,0]))
-    gamma_data = np.linspace(gamma_z - 1, gamma_z + 1, len(data[:,0]))
+    gamma_z_data = np.linspace(gamma_z - 1, gamma_z + 1, len(data[:,0]))
+    gamma_ee_data = np.linspace(gamma_ee - 0.5, gamma_ee + 0.5, len(data[:,0]))
 
     chi_m_data = []
     for i in range(len(data[:,0])):
-        chi_m_data.append(reduced_chi_square(data[:,1], data[:,2], general_function(data[:,0], m_data[i], gamma_z)))
+        chi_m_data.append(reduced_chi_square(data[:,1], data[:,2], general_function(data[:,0], m_data[i], gamma_z, gamma_ee)))
     
-    chi_gamma_data = []
+    chi_gamma_z_data = []
     for i in range(len(data[:,0])):
-        chi_gamma_data.append(reduced_chi_square(data[:,1], data[:,2], general_function(data[:,0], m_z, gamma_data[i])))
+        chi_gamma_z_data.append(reduced_chi_square(data[:,1], data[:,2], general_function(data[:,0], m_z, gamma_z_data[i], gamma_ee)))
 
-    fig, (ax1, ax2, ax3) = plt.subplots(1, 3)
+    chi_gamma_ee_data = []
+    for i in range(len(data[:,0])):
+        chi_gamma_ee_data.append(reduced_chi_square(data[:,1], data[:,2], general_function(data[:,0], m_z, gamma_z, gamma_ee_data[i])))
+
+
+    fig, (ax1, ax2, ax3, ax4) = plt.subplots(1, 4)
     ax1.errorbar(data[:, 0], data[:, 1], yerr=data[:, 2], fmt='o')
     ax1.set_title('Cross-sectional area against Energy')
     ax1.set_xlabel('Energy / Gev')
     ax1.set_ylabel('Cross-sectional area / nb')
     '''ax1.scatter(data[:,0], general_function(data[:,0], start_m_z, start_gamma_z))'''
-    ax1.scatter(data[:,0], general_function(data[:,0], m_z, gamma_z))
+    ax1.scatter(data[:,0], general_function(data[:,0], m_z, gamma_z, gamma_ee))
 
     ax2.set_title('Reduced chi-sqaured against varying m_z')
     ax2.set_xlabel('m_z / Gev*c^-2')
@@ -146,12 +152,17 @@ def plot_data(data, m_z, gamma_z):
     ax3.set_title('Reduced chi-sqaured against varying gamma_z')
     ax3.set_xlabel('gamma_z / Gev')
     ax3.set_ylabel('Reduced chi-sqaured')
-    ax3.scatter(gamma_data, chi_gamma_data)
+    ax3.scatter(gamma_z_data, chi_gamma_z_data)
+
+    ax4.set_title('Reduced chi-sqaured against varying gamma_ee')
+    ax4.set_xlabel('gamma_ee / Gev')
+    ax4.set_ylabel('Reduced chi-sqaured')
+    ax4.scatter(gamma_ee_data, chi_gamma_ee_data)
     plt.show()
 
     return None
 
-def plot_3d(data, true_m_z, true_gamma_z):
+def plot_3d(data, true_m_z, true_gamma_z, true_gamma_ee):
     """
     
     """
@@ -171,7 +182,7 @@ def plot_3d(data, true_m_z, true_gamma_z):
     for line in Y:
         temp = []
         for i in range(len(X[:,0])):
-            temp.append(reduced_chi_square(data[:,1], data[:,2], general_function(data[:,0], X[index, i], line[i])))
+            temp.append(reduced_chi_square(data[:,1], data[:,2], general_function(data[:,0], X[index, i], line[i], true_gamma_ee)))
         Z = np.vstack((Z, temp))
         index += 1
 
@@ -190,9 +201,9 @@ def main():
     
     """
     data = np.vstack((filter_initial(read_data(FILE_NAME1)),filter_initial(read_data(FILE_NAME2))))
-    data, expected_m_z, expected_gamma_z = find_final_parameters(data)
-    plot_data(data, expected_m_z, expected_gamma_z)
-    plot_3d(data, expected_m_z, expected_gamma_z)
+    data, expected_m_z, expected_gamma_z, expected_gamma_ee = find_final_parameters(data)
+    plot_data(data, expected_m_z, expected_gamma_z, expected_gamma_ee)
+    plot_3d(data, expected_m_z, expected_gamma_z, expected_gamma_ee)
 
     return 0
 
