@@ -2,7 +2,6 @@ import numpy as np
 import math
 import matplotlib.pyplot as plt
 import scipy.optimize
-from mpl_toolkits import mplot3d
 
 FILE_NAME1 = 'z_boson_data_1.csv'
 FILE_NAME2 = 'z_boson_data_2.csv'
@@ -209,39 +208,49 @@ def plot_data(data, m_z, gamma_z, gamma_ee):
         chi_gamma_ee_data.append(reduced_chi_square(data[:,1], data[:,2], general_function(data[:,0], m_z, gamma_z, gamma_ee_data[i])))
 
 
-    fig, (ax1, ax2, ax3, ax4) = plt.subplots(1, 4)
+    fig = plt.figure(figsize=(14,10))
+    ax1 = fig.add_subplot(2, 5, (1,3))
     ax1.errorbar(data[:, 0], data[:, 1], yerr=data[:, 2], fmt='o')
+    ax1.plot(np.linspace(np.min(data[:,0]), np.max(data[:,0]), 1000), general_function(np.linspace(np.min(data[:,0]), np.max(data[:,0]), 1000), m_z, gamma_z, gamma_ee))
     ax1.set_title('Cross-sectional area against Energy')
     ax1.set_xlabel('Energy / Gev')
     ax1.set_ylabel('Cross-sectional area / nb')
+    ax1.legend(['Line of best fit'],loc='best')
     '''ax1.scatter(data[:,0], general_function(data[:,0], start_m_z, start_gamma_z))'''
-    ax1.scatter(data[:,0], general_function(data[:,0], m_z, gamma_z, gamma_ee))
+    '''ax1.scatter(data[:,0], general_function(data[:,0], m_z, gamma_z, gamma_ee))'''
 
-    ax2.set_title('Reduced chi-sqaured against varying m_z')
+    ax2 = fig.add_subplot(2,5,6)
     ax2.set_xlabel('m_z / Gev*c^-2')
     ax2.set_ylabel('Reduced chi-sqaured')
     ax2.scatter(m_data, chi_m_data)
+    ax2.plot(m_z, np.min(chi_m_data), 'ro')
+    ax2.legend(['m_z = {:.2f}'.format(m_z)], loc='best')
 
-    ax3.set_title('Reduced chi-sqaured against varying gamma_z')
+    ax3 = fig.add_subplot(2,5,7)
+    '''ax3.set_title('Reduced chi-sqaured against varying parameters')'''
     ax3.set_xlabel('gamma_z / Gev')
     ax3.set_ylabel('Reduced chi-sqaured')
     ax3.scatter(gamma_z_data, chi_gamma_z_data)
+    ax3.plot(gamma_z, np.min(chi_gamma_z_data), 'ro')
+    ax3.legend(['gamma_z = {:.2f}'.format(gamma_z)], loc = 'best')
 
-    ax4.set_title('Reduced chi-sqaured against varying gamma_ee')
+    ax4 = fig.add_subplot(2,5,8)
     ax4.set_xlabel('gamma_ee / Gev')
     ax4.set_ylabel('Reduced chi-sqaured')
     ax4.scatter(gamma_ee_data, chi_gamma_ee_data)
-    plt.show()
+    ax4.plot(gamma_ee, np.min(chi_gamma_ee_data), 'ro')
+    ax4.legend(['gamma_ee = {:.2f}'.format(gamma_ee)], loc = 'best')
 
-    return None
+    return fig
 
-def plot_3d(data, m_z, gamma_z, gamma_ee):
+def plot_3d(data, fig, m_z, gamma_z, gamma_ee):
     """
     Produces a 3D plot of chi-squared against varying m_z and gamma_z
 
     Parameters
     ----------
     data: 2D numpy array of floats
+    fig: matplotlib fiure 
     m_z: float
     gamma_z: float
     gamma_ee: float
@@ -250,8 +259,7 @@ def plot_3d(data, m_z, gamma_z, gamma_ee):
     -------
     None
     """
-    fig = plt.figure()
-    ax = plt.axes(projection='3d')
+    ax5 = fig.add_subplot(2, 5, (4,10),projection='3d')
 
     diference1 = 0.05
     difference2 = 0.05
@@ -270,13 +278,15 @@ def plot_3d(data, m_z, gamma_z, gamma_ee):
         Z = np.vstack((Z, temp))
         index += 1
 
-    ax.scatter3D(X, Y, Z)
-    ax.set_xlim3d(m_z + diference1, m_z - diference1)
-    ax.set_ylim3d(gamma_z + difference2, gamma_z - difference2)
-    ax.set_zlim3d(np.min(Z), np.max(Z))
-    ax.set_xlabel('x')
-    ax.set_ylabel('y')
-    ax.set_zlabel('z')
+    ax5.scatter3D(X, Y, Z)
+    ax5.set_xlim3d(m_z + diference1, m_z - diference1)
+    ax5.set_ylim3d(gamma_z + difference2, gamma_z - difference2)
+    ax5.set_zlim3d(np.min(Z), np.max(Z))
+    ax5.set_xlabel('m_z / Gev*c^-2')
+    ax5.set_ylabel('gamma_z / Gev')
+    ax5.set_zlabel('Reduced chi-sqaured')
+
+    plt.tight_layout()
 
     plt.show()
 
@@ -289,8 +299,8 @@ def main():
     '''data = create_data()'''
     data = np.vstack((filter_initial(read_data(FILE_NAME1)),filter_initial(read_data(FILE_NAME2))))
     data, expected_m_z, expected_gamma_z, expected_gamma_ee = find_final_parameters(data)
-    plot_data(data, expected_m_z, expected_gamma_z, expected_gamma_ee)
-    plot_3d(data, expected_m_z, expected_gamma_z, expected_gamma_ee)
+    fig = plot_data(data, expected_m_z, expected_gamma_z, expected_gamma_ee)
+    plot_3d(data, fig, expected_m_z, expected_gamma_z, expected_gamma_ee)
 
     return 0
 
