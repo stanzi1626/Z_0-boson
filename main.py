@@ -1,24 +1,36 @@
 """
-Title: Bouncing Ball
+Title: Z boson
 
-This code takes in 3 user inputs: efficiency, initial height and the height
-of interest.A ball instance is then created and with those parameters,
-the resultant behaviour of the ball is modelled within the class. The number
-of bounces is calculated precisely outside of the class since class variables
-can be imprecise.
-The x position of the ball is also stored in the ball class, so there i
-s possibilty for the x velocity to be
-manipulated and x position to be plotted.
+Takes in 4 user inputs. These are the start guesses for gamma_z,
+gamma_ee and m_z as well as the uncertainty confidence. All .csv 
+files with 3 columns are then read and put into one data array.
+This array is then filtered and the paramaters for m_z, gamma_z
+and gamma_ee are estimated. The data is passed through an
+uncertianty filter and the values of the parameters subsequently
+changed until no further data points are emitted. This final data
+set is then plotted along with graphs for varying paramters against
+the resulting chi-squared. The values of the parameters are printed
+in the console alond with tau_z, the lifetime of the boson, and
+their associated uncertainties. A .png of the graph is saved
+in the same folder.
 
 Author: Alexander Stansfield
-Date created: 19/10/2021
+Date created: 14/12/2021
 """
 import math
+import glob
+import sys
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.optimize
 
-while True:
+H_BAR = 6.5821e-25 #GeV s
+start_gamma_ee = 0.1
+start_gamma_z = 3
+start_m_z = 90
+uncertainty_confidence = 3
+
+'''while True:
     try:
         start_gamma_ee = float(input(print('Input the initial guess for'
                                            ' gamma_ee, research suggests'
@@ -36,7 +48,7 @@ while True:
                                              'points: ')))
         break
     except ValueError:
-        print('Please input a number')
+        print('Please input a number')'''
 
 def general_function(energy, m_z, gamma_z, gamma_ee):
     """
@@ -96,6 +108,30 @@ def find_parameters(data):
         math.sqrt(uncertainty[0, 0]), math.sqrt(uncertainty[1, 1]),\
             math.sqrt(uncertainty[2, 2])
 
+def create_data():
+    """
+    Creates the initial data array with .csv files in the folder
+
+    Parameters
+    ----------
+    None
+
+    Returns
+    -------
+    2D numpy array of floats
+    """
+    data = np.zeros((0, 3))
+    print('Make sure that all files are in the same folder and have the'
+          ' .csv extension')
+    try:
+        for filename in glob.glob('*.csv'):
+            data = np.vstack((data, filter_initial(read_data(filename))))
+    except ValueError:
+        print('The data must have 3 columns')
+        sys.exit()
+
+    return data
+
 def read_data(filename):
     """
     Reads in data file.
@@ -112,7 +148,7 @@ def read_data(filename):
 
 def filter_initial(data):
     """
-    A filter which removes all nans, removes all 0 uncertainties
+    A filter which removes all nans, removes all <= 0 uncertainties
     and removes values which are more than 3 interquartile ranges
     outside of the lower/upper quartile
 
@@ -126,8 +162,8 @@ def filter_initial(data):
     """
     index = 0
     for line in data:
-        for i in range(0, len(line)):
-            if np.isnan(line[i]):
+        for value in enumerate(line):
+            if np.isnan(value[1]):
                 data = np.delete(data, index, axis=0)
                 index -= 1
                 break
@@ -142,31 +178,29 @@ def filter_initial(data):
     data = data[~(data[:, 1] < lower_quartile - 3*interquartile_range)]
     return data
 
-def create_data():
+def find_final_parameters(data):
     """
-    Creates the initial data array with files that user inputs
+    Finds the best parameters for function and filters data
 
     Parameters
     ----------
+    data: 2D numpy array of floats
 
     Returns
     -------
     2D numpy array of floats
+    3 floats
     """
-    data = np.zeros((0, 3))
     while True:
-        try:
-            number_of_files = int(input(print('How many files would you like'
-                                              ' to read in: ')))
+        m_z, gamma_z, gamma_ee, uncertainty_m_z, uncertainty_gamma_z,\
+            uncertainty_gamma_ee = find_parameters(data)
+        data, count = uncertainty_filter(data, m_z, gamma_z, gamma_ee)
+        if count == 0:
             break
-        except ValueError:
-            print('Please enter an integer')
-    for i in range(number_of_files):
-        filename = input(print('Input the name of the file: '))
-        temp = filter_initial(read_data(filename))
-        data = np.vstack((data, temp))
-
-    return data
+    tau_z = H_BAR / gamma_z
+    uncertainty_tau_z = H_BAR * (1 / (gamma_z)**2) * uncertainty_gamma_z
+    return data, m_z, gamma_z, gamma_ee, uncertainty_m_z, uncertainty_gamma_z,\
+        uncertainty_gamma_ee, tau_z, uncertainty_tau_z
 
 def uncertainty_filter(data, m_z, gamma_z, gamma_ee):
     """
@@ -198,28 +232,6 @@ def uncertainty_filter(data, m_z, gamma_z, gamma_ee):
         index += 1
     return data, count
 
-def find_final_parameters(data):
-    """
-    Finds the best parameters for function and filters data
-
-    Parameters
-    ----------
-    data: 2D numpy array of floats
-
-    Returns
-    -------
-    2D numpy array of floats
-    3 floats
-    """
-    while True:
-        m_z, gamma_z, gamma_ee, uncertainty_m_z, uncertainty_gamma_z,\
-            uncertainty_gamma_ee = find_parameters(data)
-        data, count = uncertainty_filter(data, m_z, gamma_z, gamma_ee)
-        if count == 0:
-            break
-    return data, m_z, gamma_z, gamma_ee, uncertainty_m_z, uncertainty_gamma_z,\
-        uncertainty_gamma_ee
-
 def plot_data(data, m_z, gamma_z, gamma_ee):
     """
     Produces a 2D plot of the data.
@@ -230,7 +242,7 @@ def plot_data(data, m_z, gamma_z, gamma_ee):
 
     Returns
     -------
-    None
+    figure
     """
 
     m_data = np.linspace(m_z - 10, m_z + 10, len(data[:, 0]))
@@ -357,17 +369,27 @@ def plot_3d(data, fig, m_z, gamma_z, gamma_ee):
 
 def main():
     """
-    blah blah blah
+    Main function. Executes all necessary functions and prints the results.
+
+    Parameters
+    ----------
+    None
+
+    Returns
+    -------
+    0
     """
     data = create_data()
     data, expected_m_z, expected_gamma_z, expected_gamma_ee, uncertainty_m_z,\
-        uncertainty_gamma_z, uncertainty_gamma_ee = \
+        uncertainty_gamma_z, uncertainty_gamma_ee, tau_z, uncertainty_tau_z = \
             find_final_parameters(data)
     print('The parameters that result in the lowest chi-squared for the data'
-          ' is:\nm_z = {0:.2f} +/- {3:.1g} [GeVc^-2]\ngamma_z = {1:.2f} +/- {4:.1g} [GeV]'
-          '\ngamma_ee = {2:.3f} +/- {5:.1g} [GeV]'\
+          ' is:\nm_z = {0:.2f} +/- {3:.1g} [GeVc^-2]\ngamma_z = {1:.2f} +/-'
+          ' {4:.1g} [GeV]\ngamma_ee = {2:.3f} +/- {5:.1g} [GeV]'
+          '\ntau_z = {6:.3g} +/- {7:.1g} [s]'\
               .format(expected_m_z, expected_gamma_z, expected_gamma_ee,\
-                   uncertainty_m_z, uncertainty_gamma_z, uncertainty_gamma_ee))
+                   uncertainty_m_z, uncertainty_gamma_z, uncertainty_gamma_ee,\
+                       tau_z, uncertainty_tau_z))
     fig = plot_data(data, expected_m_z, expected_gamma_z, expected_gamma_ee)
     plot_3d(data, fig, expected_m_z, expected_gamma_z, expected_gamma_ee)
 
