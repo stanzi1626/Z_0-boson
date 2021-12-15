@@ -2,7 +2,7 @@
 Title: Z boson
 
 Takes in 4 user inputs. These are the start guesses for gamma_z,
-gamma_ee and m_z as well as the uncertainty confidence. All .csv 
+gamma_ee and m_z as well as the uncertainty confidence. All .csv
 files with 3 columns are then read and put into one data array.
 This array is then filtered and the paramaters for m_z, gamma_z
 and gamma_ee are estimated. The data is passed through an
@@ -13,6 +13,30 @@ the resulting chi-squared. The values of the parameters are printed
 in the console alond with tau_z, the lifetime of the boson, and
 their associated uncertainties. A .png of the graph is saved
 in the same folder.
+
+As many .csv files can be inputted and filtered correctly which
+which allows for higher accuracy. Moreover, estimations can be made
+for different particles since the inital guesses for the parameters
+can be changed. Matplotlib plots the line of best fit for the data
+provided, 3 plots that show how the chi-sqaured varies with different
+values for the parameters and a 3D plot that combines the chi-squared
+for the mass and width of the boson. This 3D plot allows us to see
+that the relationship is roughly quadratic close to the estimates
+values.
+
+There are also appropriate checks in place, such as validation checks
+for initial guesses. There are also 2 places where the code will exit
+cleanly if there is a problem. The code will stop if at least 1 of the
+.csv files in the folder has more than 3 columns, this is a result of
+the np.vstack throwing up an error if thats the case. The code will
+also cleanly exit if no appropriate estimations of the parameters can
+be made withing the runtime allowed in scipy.optimize. Better inital
+guesses will not raise this error.
+
+Since we are fitting 3 parameters to the data, i.e. 3 degrees of
+freedom, the reduced chi-square is:
+
+chi_red = chi / (length of data - 3)
 
 Author: Alexander Stansfield
 Date created: 14/12/2021
@@ -25,30 +49,25 @@ import matplotlib.pyplot as plt
 import scipy.optimize
 
 H_BAR = 6.5821e-25 #GeV s
-start_gamma_ee = 0.1
-start_gamma_z = 3
-start_m_z = 90
-uncertainty_confidence = 3
 
-'''while True:
+while True:
     try:
-        start_gamma_ee = float(input(print('Input the initial guess for'
-                                           ' gamma_ee, research suggests'
-                                           ' this is around 0.1: ')))
-        start_gamma_z = float(input(print('Input the initial guess for'
-                                          ' gamma_z, research suggests this'
-                                            ' is around 3: ')))
-        start_m_z = float(input(print('Input the initial guess for m_z,'
-                                      ' research suggests this is'
-                                        ' around 90: ')))
-        uncertainty_confidence = int(input(\
-                               print('Input the uncertainty confidence, 3'
-                                     ' sigma is best suited for this data'
-                                         'as there are around 100 data'
-                                             'points: ')))
+        start_gamma_ee = float(input('Input the initial guess for'
+                                     ' gamma_ee, research suggests'
+                                     ' this is around 0.1 GeV: '))
+        start_gamma_z = float(input('Input the initial guess for'
+                                    ' gamma_z, research suggests this'
+                                    ' is around 3 GeV*c^-2: '))
+        start_m_z = float(input('Input the initial guess for m_z,'
+                                ' research suggests this is'
+                                ' around 90 GeV: '))
+        uncertainty_confidence = int(input('Input the uncertainty confidence,'
+                                           ' 3 sigma is best suited for this'
+                                           ' data as there are around 100'
+                                           ' data points: '))
         break
     except ValueError:
-        print('Please input a number')'''
+        print('Please input a number')
 
 def general_function(energy, m_z, gamma_z, gamma_ee):
     """
@@ -85,12 +104,13 @@ def reduced_chi_square(observation, observation_uncertainty, prediction):
     float
     """
     return (np.sum(((observation - prediction) / observation_uncertainty)**2))\
-        / len(observation - 1)
+        / (len(observation) - 3)
 
 def find_parameters(data):
     """
     Finds the best values for m_z, gamma_z and gamma_ee to have the
-    lowest chi-square
+    lowest chi-square. Halts code if no optimised parameters could be
+    found in the runtime allowed.
 
     Paramaters
     ----------
@@ -100,10 +120,17 @@ def find_parameters(data):
     -------
     3 floats
     """
-    expected, uncertainty = scipy.optimize.curve_fit(general_function,\
-                             data[:, 0], data[:, 1], sigma=data[:, 2],\
-                                 p0=[start_m_z, start_gamma_z,\
-                                     start_gamma_ee])
+    try:
+        expected, uncertainty = scipy.optimize.curve_fit(general_function,\
+                                data[:, 0], data[:, 1], sigma=data[:, 2],\
+                                    p0=[start_m_z, start_gamma_z,\
+                                        start_gamma_ee])
+    except RuntimeError:
+        print('Scipy.optimize.curve_fit was not able to find the best'
+              ' parameters, please run code again and input different'
+              ' starting guesses')
+        sys.exit()
+
     return expected[0], expected[1], expected[2],\
         math.sqrt(uncertainty[0, 0]), math.sqrt(uncertainty[1, 1]),\
             math.sqrt(uncertainty[2, 2])
@@ -290,21 +317,21 @@ def plot_data(data, m_z, gamma_z, gamma_ee):
     ax1.legend(['Line of best fit'], loc='best')
 
     ax2 = fig.add_subplot(2, 5, 6)
-    ax2.set_xlabel('m_z [GeV$c^{-2}$]')
+    ax2.set_xlabel('$m_z$ [GeV$c^{-2}$]')
     ax2.set_ylabel('Reduced chi-sqaured')
     ax2.scatter(m_data, chi_m_data)
     ax2.plot(m_z, np.min(chi_m_data), 'ro')
     ax2.legend(['m_z = {:.2f}'.format(m_z)], loc='best')
 
     ax3 = fig.add_subplot(2, 5, 7)
-    ax3.set_xlabel('gamma_z [GeV]')
+    ax3.set_xlabel(r'$\Gamma_z$ [GeV]')
     ax3.set_ylabel('Reduced chi-sqaured')
     ax3.scatter(gamma_z_data, chi_gamma_z_data)
     ax3.plot(gamma_z, np.min(chi_gamma_z_data), 'ro')
     ax3.legend(['gamma_z = {:.2f}'.format(gamma_z)], loc='best')
 
     ax4 = fig.add_subplot(2, 5, 8)
-    ax4.set_xlabel('gamma_ee [GeV]')
+    ax4.set_xlabel(r'$\Gamma_{ee}$ [GeV]')
     ax4.set_ylabel('Reduced chi-sqaured')
     ax4.scatter(gamma_ee_data, chi_gamma_ee_data)
     ax4.plot(gamma_ee, np.min(chi_gamma_ee_data), 'ro')
@@ -356,9 +383,9 @@ def plot_3d(data, fig, m_z, gamma_z, gamma_ee):
     ax5.set_xlim3d(m_z + diference1, m_z - diference1)
     ax5.set_ylim3d(gamma_z + difference2, gamma_z - difference2)
     ax5.set_zlim3d(np.min(z_mesh), np.max(z_mesh))
-    ax5.set_title('Reduced chi-squared against m_z and gamma_z')
-    ax5.set_xlabel('m_z [GeV$c^{-2}$]')
-    ax5.set_ylabel('gamma_z [GeV]')
+    ax5.set_title(r'Reduced chi-squared against $m_z$ and $\Gamma_z$')
+    ax5.set_xlabel('$m_z$ [GeV$c^{-2}$]')
+    ax5.set_ylabel(r'$\Gamma_z$ [GeV]')
     ax5.set_zlabel('Reduced chi-sqaured')
 
     plt.tight_layout()
@@ -384,12 +411,19 @@ def main():
         uncertainty_gamma_z, uncertainty_gamma_ee, tau_z, uncertainty_tau_z = \
             find_final_parameters(data)
     print('The parameters that result in the lowest chi-squared for the data'
-          ' is:\nm_z = {0:.2f} +/- {3:.1g} [GeVc^-2]\ngamma_z = {1:.2f} +/-'
-          ' {4:.1g} [GeV]\ngamma_ee = {2:.3f} +/- {5:.1g} [GeV]'
-          '\ntau_z = {6:.3g} +/- {7:.1g} [s]'\
+          ' is:\nThe mass of the boson is: {0:.4g} +/- {3:.1g} [GeVc^-2]\nThe'
+          ' width of the boson is: {1:.4g} +/- {4:.1g} [GeV]'
+          '\nThe partial width for the positron and electrong: {2:.4g} +/-'
+          ' {5:.1g} [GeV]\nThe lifetime of the boson: {6:.3g} +/- '
+          '{7:.1g} [seconds]\nThe final chi-square for the data is: {8:.3f}'\
               .format(expected_m_z, expected_gamma_z, expected_gamma_ee,\
                    uncertainty_m_z, uncertainty_gamma_z, uncertainty_gamma_ee,\
-                       tau_z, uncertainty_tau_z))
+                    tau_z, uncertainty_tau_z,
+                      reduced_chi_square(data[:, 1], data[:, 2],
+                                         general_function(data[:, 0],
+                                                          expected_m_z,
+                                                          expected_gamma_z,
+                                                          expected_gamma_ee))))
     fig = plot_data(data, expected_m_z, expected_gamma_z, expected_gamma_ee)
     plot_3d(data, fig, expected_m_z, expected_gamma_z, expected_gamma_ee)
 
